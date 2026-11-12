@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SecureBank Crypto Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a phone (the customer's app) beside the bank's server console; every action in the app writes a cryptographic record to the console. */
+:root{
+  --bg:#e9eeeb; --surface:#ffffff; --sunk:#f2f5f3; --ink:#13201b; --muted:#56665f; --line:#d3dcd7;
+  --accent:#0b6e51; --accent-soft:#dcefe7; --accent-ink:#ffffff; --frame:#1b2622;
+  --good:#17784a; --good-soft:#ddf1e5; --bad:#b33a2e; --bad-soft:#f8e1de; --warn:#94600a; --warn-soft:#f7ecd6;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1311; --surface:#151f1b; --sunk:#101916; --ink:#e3ebe7; --muted:#93a59d; --line:#28362f;
+  --accent:#3db387; --accent-soft:#183129; --accent-ink:#05120d; --frame:#000000;
+  --good:#5cc98f; --good-soft:#15291f; --bad:#ee7c6e; --bad-soft:#341b18; --warn:#e0a548; --warn-soft:#2f2412; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1311; --surface:#151f1b; --sunk:#101916; --ink:#e3ebe7; --muted:#93a59d; --line:#28362f;
+  --accent:#3db387; --accent-soft:#183129; --accent-ink:#05120d; --frame:#000000;
+  --good:#5cc98f; --good-soft:#15291f; --bad:#ee7c6e; --bad-soft:#341b18; --warn:#e0a548; --warn-soft:#2f2412; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 40px}
+h1,h2,h3{margin:0;text-wrap:balance}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:24px}
+.head{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:end;justify-content:space-between}
+.head h1{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.head p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.meta{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.stage{display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:860px){.stage{grid-template-columns:minmax(0,1fr)}}
+
+/* phone */
+.phone{background:var(--frame);border-radius:40px;padding:10px;max-width:400px;width:100%;margin:0 auto;box-shadow:0 18px 40px -24px rgba(0,0,0,.45)}
+.screen{background:var(--surface);border-radius:31px;height:720px;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.status{display:flex;justify-content:space-between;align-items:center;padding:12px 22px 6px;font-size:12px;font-weight:600}
+.status .lock{font-family:var(--mono);font-size:11px;color:var(--good);font-weight:500}
+.view{flex:1;overflow-y:auto;padding:8px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.nav{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:var(--surface)}
+.nav button{background:none;border:0;padding:10px 4px 14px;font-size:11.5px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px}
+.nav button svg{width:20px;height:20px}
+.nav button[aria-current="page"]{color:var(--accent);font-weight:600}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px}
+.brand i{width:26px;height:26px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-style:normal;font-size:13px}
+.title{font-size:20px;font-weight:600}
+.sub{color:var(--muted);font-size:13px;margin:0}
+label{display:grid;gap:5px;font-size:12.5px;font-weight:500;color:var(--muted)}
+input[type=text],input[type=password],input[type=number]{width:100%;border:1px solid var(--line);background:var(--sunk);border-radius:10px;padding:11px 12px;font-size:16px;color:var(--ink)}
+input.pin{font-family:var(--mono);letter-spacing:.5em;text-align:center;font-size:22px}
+.chk{display:flex;gap:8px;align-items:flex-start;font-weight:400;color:var(--ink);font-size:13px;background:var(--warn-soft);border-radius:10px;padding:10px 12px}
+.chk input{margin-top:3px;accent-color:var(--bad)}
+.btn{border:0;border-radius:12px;padding:13px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink);cursor:pointer;width:100%}
+.btn.ghost{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:var(--bad);color:#fff}
+.btn:disabled{opacity:.55;cursor:progress}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:6px}
+.balance{background:var(--accent);color:var(--accent-ink);border:0}
+.balance .amt{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.balance .iban{font-family:var(--mono);font-size:11.5px;opacity:.85}
+.list{display:grid}
+.tx{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.tx:last-child{border-bottom:0}
+.tx small{display:block;color:var(--muted);font-size:12px}
+.tx .v{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.tx .v.neg{color:var(--ink)} .tx .v.pos{color:var(--good)}
+.hexbox{font-family:var(--mono);font-size:11px;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;color:var(--muted);max-height:120px;overflow:auto}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.result{border-radius:16px;padding:18px;display:grid;gap:8px}
+.result.ok{background:var(--good-soft)} .result.no{background:var(--bad-soft)}
+.result h3{font-size:18px}
+.result.ok h3{color:var(--good)} .result.no h3{color:var(--bad)}
+.sms{position:absolute;left:12px;right:12px;top:40px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 12px 30px -12px rgba(0,0,0,.35);font-size:13px;z-index:3}
+.sms b{display:block;font-size:12px;color:var(--muted);font-weight:600}
+.sms code{font-family:var(--mono);font-size:18px;letter-spacing:.15em;color:var(--ink)}
+.mtab{width:100%;border-collapse:collapse;font-size:12.5px}
+.mtab td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.mtab td:last-child{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:8px}
+.err{color:var(--bad);font-size:13px;margin:0;min-height:1em}
+
+/* server console */
+.server{background:var(--surface);border:1px solid var(--line);border-radius:20px;display:flex;flex-direction:column;min-height:740px;max-height:740px;min-width:0}
+@media (max-width:860px){.server{min-height:0;max-height:680px}}
+.srv-head{padding:16px 18px;border-bottom:1px solid var(--line);display:grid;gap:10px}
+.srv-head h2{font-size:16px;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.srv-state{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.kv{background:var(--sunk);border-radius:10px;padding:8px 10px;min-width:0}
+.kv span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.kv b{font-family:var(--mono);font-size:12px;font-weight:500;word-break:break-all}
+.log{flex:1;overflow-y:auto;padding:8px 18px 18px;display:flex;flex-direction:column;gap:2px;min-height:240px}
+.empty{color:var(--muted);padding:24px 0;font-size:13px}
+.entry{display:grid;grid-template-columns:4px minmax(0,1fr);gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.entry .bar{border-radius:2px;background:var(--line)}
+.entry.app .bar{background:var(--accent)} .entry.bank .bar{background:var(--ink)}
+.entry.ok .bar{background:var(--good)} .entry.no .bar{background:var(--bad)} .entry.att .bar{background:var(--warn)}
+.entry h4{margin:0;font-size:13.5px;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+.entry h4 em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:400}
+.entry .who{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.entry dl{margin:6px 0 0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 12px;font-size:12px}
+.entry dt{color:var(--muted)}
+.entry dd{margin:0;font-family:var(--mono);font-size:11.5px;word-break:break-all}
+.foot{color:var(--muted);font-size:12.5px;max-width:80ch}
+@media (prefers-reduced-motion:no-preference){.entry{animation:in .25s ease-out}@keyframes in{from{transform:translateY(-4px);opacity:.4}to{transform:none;opacity:1}}}
+.hd-right{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.btn.small{width:auto;padding:8px 14px;font-size:13px}
+.switch{display:none}
+@media (max-width:860px){
+  body{padding-block:12px 24px}
+  .wrap{gap:12px}
+  .head{flex-wrap:nowrap;align-items:center}
+  .head h1{font-size:20px}
+  .srv-state{grid-template-columns:1fr 1fr}
+  .head p,.head .meta,.foot{display:none}
+  .switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:4px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+  .switch button{border:0;background:none;padding:10px;border-radius:9px;font-weight:600;color:var(--muted);cursor:pointer;display:flex;gap:6px;justify-content:center;align-items:center}
+  .switch button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .badge{background:var(--bad);color:#fff;border-radius:999px;font-size:11px;padding:1px 7px;font-variant-numeric:tabular-nums}
+  .stage[data-pane="app"] .server{display:none}
+  .stage[data-pane="server"] .phone{display:none}
+  .phone{background:none;padding:0;border-radius:0;box-shadow:none;max-width:none}
+  .screen{height:calc(100dvh - 130px);min-height:520px;border:1px solid var(--line);border-radius:20px}
+  .status{display:none}
+  .server{min-height:calc(100dvh - 130px);max-height:none}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="head">
+    <div>
+      <h1>SecureBank Crypto Lab</h1>
+      <p>A mobile banking prototype that runs real cryptography in your browser (Web Crypto API). Use the app on the left; the bank server on the right records every key, hash and signature.</p>
+    </div>
+    <div class="hd-right"><div class="meta">Daniel Minazarov · 35668 · Information Protection, Task 5</div><button class="btn ghost small" id="reset">Reset demo</button></div>
+  </header>
+
+  <div class="switch" role="group" aria-label="Choose view"><button id="tApp" aria-pressed="true">Phone app</button><button id="tSrv" aria-pressed="false">Bank server <span class="badge" id="badge" hidden>0</span></button></div>
+
+  <div class="stage" id="stage" data-pane="app">
+    <div class="phone">
+      <div class="screen">
+        <div class="status"><span id="clock">9:41</span><span class="lock" id="tls">TLS 1.3 · pinned</span></div>
+        <div class="view" id="view"></div>
+        <div id="smsSlot"></div>
+        <nav class="nav" id="nav" hidden>
+          <button data-go="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+          <button data-go="transfer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg>Transfer</button>
+          <button data-go="security"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/></svg>Security</button>
+          <button data-go="bench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 13l4-4M4 18a9 9 0 1 1 16 0"/></svg>Speed test</button>
+        </nav>
+      </div>
+    </div>
+
+    <section class="server" aria-label="Bank server console">
+      <div class="srv-head">
+        <h2>Bank server console <span class="pill" id="srvPill">Waiting for enrolment</span></h2>
+        <div class="srv-state">
+          <div class="kv"><span>PIN record (PBKDF2)</span><b id="stPin">none</b></div>
+          <div class="kv"><span>Device public key</span><b id="stKey">none</b></div>
+          <div class="kv"><span>Used nonces</span><b id="stNonce">0</b></div>
+          <div class="kv"><span>Ledger balance</span><b id="stBal">12 480.55 PLN</b></div>
+        </div>
+      </div>
+      <div class="log" id="log"><p class="empty" id="logEmpty">No traffic yet. Create a PIN in the app to enrol this device.</p></div>
+    </section>
+  </div>
+
+  <p class="foot">Educational prototype. In a production app the private key would be created inside the Secure Enclave or Android StrongBox, and the server would run behind an HSM. Here the browser's non-extractable CryptoKey objects play that role; nothing leaves this page.</p>
+</div>
+
+<script>
+const subtle = crypto.subtle, enc = new TextEncoder(), dec = new TextDecoder();
+const $ = s => document.querySelector(s);
+const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join('');
+const short = (h, n=16) => h.length > n*2 ? h.slice(0,n) + '…' + h.slice(-8) : h;
+const rand = n => crypto.getRandomValues(new Uint8Array(n));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pln = v => v.toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' PLN';
+const ms = t => t < 1 ? t.toFixed(3) + ' ms' : t.toFixed(1) + ' ms';
+const ITER = 600000, OTP_LIMIT = 1000, ATTACKER_IBAN = 'PL10105000997603123456789123';
+
+let S;
+const fresh = () => ({
+  bank: { pinSalt:null, pinHash:null, pubKey:null, pubFp:null, otpSecret:null, nonces:new Set(), balance:12480.55, fails:0, locked:false },
+  dev:  { priv:null, aes:null, vault:null, otpSecret:null },
+  account: { owner:'Daniel Minazarov', iban:'PL61109010140000071219812874' },
+  session:false, last:null, pending:null, view:'register'
+});
+S = fresh();
+let unread = 0;
+const narrow = () => matchMedia('(max-width:860px)').matches;
+function badge(){ const b = $('#badge'); b.hidden = !unread; b.textContent = unread; }
+function setPane(p){
+  $('#stage').dataset.pane = p;
+  $('#tApp').setAttribute('aria-pressed', p==='app');
+  $('#tSrv').setAttribute('aria-pressed', p==='server');
+  if (p==='server'){ unread = 0; badge(); $('#log').scrollTop = 0; }
+}
+
+/* ---------- log ---------- */
+function log(kind, who, title, rows={}, t){
+  $('#logEmpty')?.remove();
+  const e = document.createElement('div');
+  e.className = 'entry ' + kind;
+  const dl = Object.entries(rows).map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  e.innerHTML = `<div class="bar"></div><div><div class="who">${esc(who)}</div><h4>${esc(title)}${t!=null?` <em>${ms(t)}</em>`:''}</h4>${dl?`<dl>${dl}</dl>`:''}</div>`;
+  const L = $('#log'); L.prepend(e);
+  if (narrow() && $('#stage').dataset.pane==='app'){ unread++; badge(); }
+}
+function syncServer(){
+  $('#stPin').textContent = S.bank.pinHash ? short(S.bank.pinHash,10) : 'none';
+  $('#stKey').textContent = S.bank.pubFp ? 'SHA-256 ' + S.bank.pubFp : 'none';
+  $('#stNonce').textContent = S.bank.nonces.size;
+  $('#stBal').textContent = pln(S.bank.balance);
+  const p = $('#srvPill');
+  if (S.bank.locked){ p.textContent='Account locked'; p.className='pill bad'; }
+  else if (S.bank.pubKey){ p.textContent='Device enrolled'; p.className='pill'; }
+}
+
+/* ---------- crypto primitives ---------- */
+async function pbkdf2(pin, salt){
+  const k = await subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveBits']);
+  return hex(await subtle.deriveBits({name:'PBKDF2', hash:'SHA-256', salt, iterations:ITER}, k, 256));
+}
+function safeEqual(a,b){ if(a.length!==b.length) return false; let r=0; for(let i=0;i<a.length;i++) r |= a.charCodeAt(i)^b.charCodeAt(i); return r===0; }
+async function sha256(data){ return hex(await subtle.digest('SHA-256', typeof data==='string'?enc.encode(data):data)); }
+async function totp(secret, step=Math.floor(Date.now()/30000)){
+  const k = await subtle.importKey('raw', secret, {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+  const ctr = new ArrayBuffer(8); new DataView(ctr).setUint32(4, step);
+  const h = new Uint8Array(await subtle.sign('HMAC', k, ctr));
+  const o = h[h.length-1] & 15;
+  const n = ((h[o]&127)<<24 | h[o+1]<<16 | h[o+2]<<8 | h[o+3]) % 1e6;
+  return String(n).padStart(6,'0');
+}
+async function sealVault(data){
+  const iv = rand(12);
+  const ct = await subtle.encrypt({name:'AES-GCM', iv}, S.dev.aes, enc.encode(JSON.stringify(data)));
+  S.dev.vault = {iv, ct};
+  return {iv:hex(iv), ct:hex(ct), bytes:ct.byteLength};
+}
+async function openVault(){
+  const pt = await subtle.decrypt({name:'AES-GCM', iv:S.dev.vault.iv}, S.dev.aes, S.dev.vault.ct);
+  return JSON.parse(dec.decode(pt));
+}
+const canon = tx => JSON.stringify({from:tx.from,to:tx.to,name:tx.name,amount:tx.amount,currency:tx.currency,title:tx.title,nonce:tx.nonce,ts:tx.ts});
+function ibanOk(iban){
+  const s = iban.replace(/\s+/g,'').toUpperCase();
+  if(!/^PL\d{26}$/.test(s)) return false;
+  const r = (s.slice(4)+s.slice(0,4)).replace(/[A-Z]/g, c => c.charCodeAt(0)-55);
+  let m = 0; for (const d of r) m = (m*10 + +d) % 97;
+  return m === 1;
+}
+
+/* ---------- views ---------- */
+const view = $('#view');
+function go(v){
+  S.view = v;
+  $('#nav').hidden = !S.session;
+  document.querySelectorAll('#nav button').forEach(b => { if(b.dataset.go===v) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  $('#smsSlot').innerHTML = '';
+  ({register, login, home, transfer, otp, security, bench})[v]?.();
+}
+document.querySelectorAll('#nav button').forEach(b => b.onclick = () => go(b.dataset.go));
+
+function register(){
+  view.innerHTML = `
+    <div class="brand"><i>SB</i>SecureBank</div>
+    <div><h2 class="title">Activate this phone</h2><p class="sub">Choose a 4–6 digit PIN. Enrolment creates your keys and registers the device with the bank.</p></div>
+    <label for="p1">New PIN<input id="p1" class="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" value="4829"></label>
+    <label for="p2">Repeat PIN<input id="p2" class="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" value="4829"></label>
+    <p class="err" id="err"></p>
+    <button class="btn" id="go">Create PIN and enrol device</button>
+    <div class="card"><span class="pill">What happens</span>
+      <p class="sub">PBKDF2-SHA256 (600,000 iterations) hashes the PIN · ECDSA P-256 key pair is created, private key non-exportable · AES-256-GCM key encrypts local data · HMAC secret is shared for one-time codes.</p></div>`;
+  $('#go').onclick = async () => {
+    const a = $('#p1').value, b = $('#p2').value, err = $('#err');
+    if(!/^\d{4,6}$/.test(a)) return err.textContent = 'The PIN must be 4 to 6 digits.';
+    if(a!==b) return err.textContent = 'The two PINs do not match.';
+    const btn = $('#go'); btn.disabled = true; btn.textContent = 'Enrolling…';
+    let t = performance.now();
+    const salt = rand(16), h = await pbkdf2(a, salt);
+    S.bank.pinSalt = salt; S.bank.pinHash = h;
+    log('app','App → Bank','PIN hashed with PBKDF2-HMAC-SHA256',{iterations:ITER.toLocaleString('en'), salt:hex(salt), 'stored hash':h, 'plain PIN':'never stored or sent in clear'}, performance.now()-t);
+
+    t = performance.now();
+    const kp = await subtle.generateKey({name:'ECDSA', namedCurve:'P-256'}, false, ['sign','verify']);
+    const spki = await subtle.exportKey('spki', kp.publicKey);
+    S.dev.priv = kp.privateKey; S.bank.pubKey = kp.publicKey; S.bank.pubFp = short(await sha256(spki),8);
+    log('app','Secure hardware','ECDSA P-256 key pair generated',{curve:'NIST P-256 (secp256r1)', 'private key':'non-extractable (stays in secure element)', 'public key (SPKI)':short(hex(spki),24), 'sent to bank':spki.byteLength+' bytes'}, performance.now()-t);
+
+    t = performance.now();
+    S.dev.aes = await subtle.generateKey({name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+    const sec = rand(20); S.dev.otpSecret = sec; S.bank.otpSecret = sec;
+    const v = await sealVault({tx:[
+      {d:'2026-11-10', n:'Biedronka, Warszawa', a:-86.40},
+      {d:'2026-11-08', n:'Salary, part-time', a:2350.00},
+      {d:'2026-11-05', n:'ZTM Warszawa ticket', a:-110.00},
+      {d:'2026-11-03', n:'Spotify', a:-23.99}]});
+    log('app','App (device storage)','Local data encrypted with AES-256-GCM',{key:'256-bit, non-extractable', IV:v.iv+' (96-bit, random)', ciphertext:short(v.ct,20), size:v.bytes+' bytes incl. 128-bit auth tag'}, performance.now()-t);
+    log('bank','Bank server','Device enrolled',{'public key fingerprint':S.bank.pubFp, 'OTP secret':'160-bit, shared once over TLS', status:'ready'});
+    syncServer();
+    S.session = true; go('home');
+  };
+}
+
+function login(){
+  view.innerHTML = `
+    <div class="brand"><i>SB</i>SecureBank</div>
+    <div><h2 class="title">Enter your PIN</h2><p class="sub">${S.bank.locked ? 'Too many wrong PINs. The bank has locked access.' : `Attempts left: ${3 - S.bank.fails}`}</p></div>
+    <label for="pin">PIN<input id="pin" class="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" ${S.bank.locked?'disabled':''}></label>
+    <p class="err" id="err"></p>
+    <button class="btn" id="go" ${S.bank.locked?'disabled':''}>Unlock</button>
+    <p class="sub">Tip: try a wrong PIN to see the brute-force limit. The demo PIN is 4829.</p>`;
+  if (S.bank.locked) return;
+  $('#pin').focus();
+  const submit = async () => {
+    const btn = $('#go'); btn.disabled = true;
+    const t = performance.now();
+    const h = await pbkdf2($('#pin').value, S.bank.pinSalt);
+    const ok = safeEqual(h, S.bank.pinHash);
+    if (ok){
+      S.bank.fails = 0;
+      log('ok','Bank server','PIN accepted',{'recomputed hash':short(h,12), comparison:'constant-time'}, performance.now()-t);
+      S.session = true; go('home');
+    } else {
+      S.bank.fails++;
+      if (S.bank.fails >= 3) S.bank.locked = true;
+      log('no','Bank server','Wrong PIN',{'recomputed hash':short(h,12), 'failed attempts':S.bank.fails+' of 3', defence:S.bank.locked?'account locked':'slow hash + attempt limit'}, performance.now()-t);
+      syncServer(); login(); $('#err').textContent = S.bank.locked ? 'Access locked after 3 wrong PINs.' : 'Wrong PIN.';
+    }
+  };
+  $('#go').onclick = submit;
+  $('#pin').onkeydown = e => { if(e.key==='Enter') submit(); };
+}
+
+async function home(){
+  const t = performance.now();
+  const data = await openVault();
+  const dt = performance.now()-t;
+  view.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center"><div class="brand"><i>SB</i>SecureBank</div><button class="btn ghost" id="lock" style="width:auto;padding:8px 12px">Lock</button></div>
+    <p class="sub">Hello, ${esc(S.account.owner)}</p>
+    <div class="card balance"><span style="font-size:12.5px;opacity:.85">Available balance</span><span class="amt">${pln(S.bank.balance)}</span><span class="iban">${S.account.iban.replace(/(.{4})/g,'$1 ')}</span></div>
+    <div><h3 style="font-size:14px;margin-bottom:4px">Recent activity</h3>
+    <div class="list">${data.tx.slice(0,6).map(x=>`<div class="tx"><div>${esc(x.n)}<small>${x.d}</small></div><div class="v ${x.a<0?'neg':'pos'}">${x.a>0?'+':''}${pln(x.a)}</div></div>`).join('')}</div></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="pill">Stored encrypted</span><span class="meta">decrypted in ${ms(dt)}</span></div>
+    <p class="sub">This list is saved on the phone only as AES-256-GCM ciphertext:</p>
+    <div class="hexbox">${hex(S.dev.vault.ct)}</div></div>`;
+  $('#lock').onclick = () => { S.session = false; log('app','App','Session locked',{reason:'user action'}); go('login'); };
+}
+
+function transfer(){
+  view.innerHTML = `
+    <h2 class="title">New transfer</h2>
+    <label for="nm">Recipient name<input id="nm" type="text" value="Emir Malikov"></label>
+    <label for="ib">Recipient IBAN<input id="ib" type="text" value="PL27 1140 2004 0000 3002 0135 5387" style="font-family:var(--mono);font-size:13px"></label>
+    <div class="row2"><label for="am">Amount, PLN<input id="am" type="number" min="0.01" step="0.01" value="250.00"></label><label for="ti">Title<input id="ti" type="text" value="Rent share"></label></div>
+    <label class="chk" for="mal"><input type="checkbox" id="mal"><span><b>Simulate malware</b> on the phone: change the recipient IBAN after the transfer is signed.</span></label>
+    <p class="err" id="err"></p>
+    <button class="btn" id="go">Sign and send</button>
+    <p class="sub">Transfers above ${pln(OTP_LIMIT)} also need a one-time code (PSD2 strong customer authentication).</p>`;
+  $('#go').onclick = async () => {
+    const err = $('#err'); err.textContent = '';
+    const to = $('#ib').value.replace(/\s+/g,'').toUpperCase(), amount = Number($('#am').value);
+    if (!ibanOk(to)) return err.textContent = 'This IBAN fails the ISO 13616 mod-97 check. Check the digits.';
+    if (!(amount > 0)) return err.textContent = 'Enter an amount above 0.';
+    const tx = {from:S.account.iban, to, name:$('#nm').value.trim()||'Recipient', amount:amount.toFixed(2), currency:'PLN', title:$('#ti').value.trim(), nonce:hex(rand(16)), ts:Date.now()};
+    const t = performance.now();
+    const msg = canon(tx), dg = await sha256(msg);
+    const sig = await subtle.sign({name:'ECDSA', hash:'SHA-256'}, S.dev.priv, enc.encode(msg));
+    log('app','App (secure hardware)','Transfer signed with ECDSA P-256',{to:tx.to, amount:tx.amount+' PLN', nonce:tx.nonce, 'SHA-256 of message':dg, signature:short(hex(sig),24)+' (64 bytes)'}, performance.now()-t);
+    let sent = {...tx};
+    if ($('#mal').checked){
+      sent.to = ATTACKER_IBAN;
+      log('att','Malware on phone','Recipient changed after signing',{original:tx.to, replaced:ATTACKER_IBAN});
+    }
+    const req = {tx:sent, sig};
+    if (amount > OTP_LIMIT){ S.pending = req; return go('otp'); }
+    await bankProcess(req, false);
+  };
+}
+
+async function otp(){
+  const code = await totp(S.bank.otpSecret);
+  log('bank','Bank server','Strong customer authentication required',{reason:'amount > '+OTP_LIMIT+' PLN', method:'TOTP (RFC 6238), HMAC-SHA256, 30 s window', delivery:'SMS / push'});
+  $('#smsSlot').innerHTML = `<div class="sms" role="status"><b>Messages · SecureBank</b>Your confirmation code is <code>${code}</code>. Never share it.</div>`;
+  view.innerHTML = `
+    <div style="height:70px"></div>
+    <h2 class="title">Confirm the transfer</h2>
+    <p class="sub">${esc(S.pending.tx.amount)} PLN to ${esc(S.pending.tx.name)}. Enter the 6-digit code from the message.</p>
+    <label for="code">One-time code<input id="code" class="pin" inputmode="numeric" maxlength="6" type="text" autocomplete="one-time-code"></label>
+    <p class="err" id="err"></p>
+    <button class="btn" id="go">Confirm</button>
+    <button class="btn ghost" id="cancel">Cancel</button>`;
+  $('#cancel').onclick = () => { S.pending = null; go('transfer'); };
+  $('#go').onclick = async () => {
+    const t = performance.now();
+    const expect = await totp(S.bank.otpSecret);
+    const ok = safeEqual($('#code').value.trim(), expect);
+    log(ok?'ok':'no','Bank server', ok?'One-time code valid':'One-time code rejected',{'computed by bank':'HMAC-SHA256(secret, time step)'}, performance.now()-t);
+    if (!ok) return $('#err').textContent = 'That code is not valid. Check the message and try again.';
+    $('#smsSlot').innerHTML = '';
+    const req = S.pending; S.pending = null;
+    await bankProcess(req, false);
+  };
+}
+
+async function bankProcess(req, replay){
+  const tx = req.tx, t = performance.now();
+  const valid = await subtle.verify({name:'ECDSA', hash:'SHA-256'}, S.bank.pubKey, req.sig, enc.encode(canon(tx)));
+  const age = (Date.now() - tx.ts)/1000;
+  let reason = null;
+  if (!valid) reason = 'Signature does not match the transaction data. The message was changed after signing.';
+  else if (S.bank.nonces.has(tx.nonce)) reason = 'This nonce was already used. The request is a replay of an earlier transfer.';
+  else if (age > 300) reason = 'Timestamp older than 5 minutes.';
+  else if (Number(tx.amount) > S.bank.balance) reason = 'Insufficient funds.';
+  const dt = performance.now()-t;
+  if (reason){
+    log(replay?'att':'no','Bank server','Transfer REJECTED',{'ECDSA verify':valid?'valid':'INVALID', nonce:S.bank.nonces.has(tx.nonce)?'already used':'fresh', reason}, dt);
+  } else {
+    S.bank.nonces.add(tx.nonce);
+    S.bank.balance = Math.round((S.bank.balance - Number(tx.amount))*100)/100;
+    const data = await openVault();
+    data.tx.unshift({d:new Date().toISOString().slice(0,10), n:'To '+tx.name+(tx.title?' · '+tx.title:''), a:-Number(tx.amount)});
+    const v = await sealVault(data);
+    log('ok','Bank server','Transfer ACCEPTED and booked',{'ECDSA verify':'valid with registered public key', nonce:'fresh, now stored', 'timestamp age':age.toFixed(1)+' s', 'device cache':'re-encrypted, new IV '+v.iv}, dt);
+  }
+  S.last = req; syncServer();
+  view.innerHTML = `
+    <div class="result ${reason?'no':'ok'}"><h3>${reason?'Transfer rejected':'Transfer sent'}</h3>
+      <p class="sub" style="color:var(--ink)">${reason?esc(reason):`${esc(tx.amount)} PLN to ${esc(tx.name)}`}</p></div>
+    <div class="card"><span class="pill ${valid?'':'bad'}">${valid?'Signature valid':'Signature invalid'}</span>
+      <p class="sub">The bank checked the ECDSA signature, the nonce and the timestamp before booking.</p></div>
+    <button class="btn ghost" id="rep">Attacker: replay this exact request</button>
+    <button class="btn" id="back">Back to account</button>`;
+  $('#back').onclick = () => go('home');
+  $('#rep').onclick = async () => {
+    log('att','Attacker on network','Captured request sent again',{nonce:S.last.tx.nonce, signature:'original, unchanged'});
+    await bankProcess(S.last, true);
+  };
+}
+
+function security(){
+  const m = [
+    ['Connection','TLS 1.3, ECDHE X25519, AES-256-GCM, certificate pinning'],
+    ['PIN storage','PBKDF2-HMAC-SHA256, 600,000 iterations, 128-bit salt'],
+    ['Brute-force limit','3 wrong PINs locks access'],
+    ['Local data','AES-256-GCM, 96-bit random IV, 128-bit tag'],
+    ['Transfer signing','ECDSA P-256 + SHA-256, private key non-exportable'],
+    ['Replay protection','128-bit nonce + 5-minute timestamp window'],
+    ['Strong authentication','TOTP, HMAC-SHA256, 6 digits, 30 s'],
+    ['Key storage','Secure Enclave / StrongBox (device), HSM FIPS 140-3 (bank)'],
+  ];
+  view.innerHTML = `<h2 class="title">Security settings</h2><p class="sub">Cryptographic methods active in this app.</p>
+    <table class="mtab"><tbody>${m.map(([a,b])=>`<tr><td style="font-weight:600;width:38%">${a}</td><td style="text-align:left;font-family:var(--sans);white-space:normal">${b}</td></tr>`).join('')}</tbody></table>
+    <div class="card"><span class="pill">Device key</span><p class="sub">Fingerprint registered at the bank:</p><div class="hexbox">${S.bank.pubFp}</div></div>
+    <div class="card"><span class="pill warn">Planned</span><p class="sub">Hybrid post-quantum key exchange (X25519 + ML-KEM-768) and ML-DSA signatures, see the maintenance plan in the report.</p></div>`;
+}
+
+function bench(){
+  view.innerHTML = `<h2 class="title">Speed test</h2><p class="sub">Measures each algorithm on this device with the Web Crypto API. Results feed section 4 of the report.</p>
+    <button class="btn" id="go">Run tests</button>
+    <table class="mtab"><tbody id="res"><tr><td colspan="2" class="sub">Press Run tests. It takes about 5 seconds.</td></tr></tbody></table>`;
+  $('#go').onclick = async () => {
+    const btn = $('#go'); btn.disabled = true; btn.textContent = 'Running…';
+    const res = $('#res'); res.innerHTML = '';
+    const add = (a,b) => { res.insertAdjacentHTML('beforeend', `<tr><td>${a}</td><td>${b}</td></tr>`); };
+    const time = async (fn, n) => { await fn(); const t = performance.now(); for (let i=0;i<n;i++) await fn(); return (performance.now()-t)/n; };
+    const big = new Uint8Array(1<<20); for (let o=0;o<big.length;o+=65536) crypto.getRandomValues(big.subarray(o,o+65536));
+    const iv = rand(12), msg = enc.encode('{"to":"PL27114020040000300201355387","amount":"250.00"}');
+    const pause = () => new Promise(r => setTimeout(r, 20));
+    for (const len of [128,256]){ const k = await subtle.generateKey({name:'AES-GCM',length:len},false,['encrypt']); const t = await time(()=>subtle.encrypt({name:'AES-GCM',iv},k,big),20); add(`AES-${len}-GCM, 1 MB`, `${ms(t)} · ${Math.round(1000/t)} MB/s`); await pause(); }
+    add('SHA-256, 1 MB', ms(await time(()=>subtle.digest('SHA-256',big),20))); await pause();
+    add('ECDSA P-256 key pair', ms(await time(()=>subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign']),20))); await pause();
+    const ec = await subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
+    const es = await subtle.sign({name:'ECDSA',hash:'SHA-256'},ec.privateKey,msg);
+    add('ECDSA P-256 sign', ms(await time(()=>subtle.sign({name:'ECDSA',hash:'SHA-256'},ec.privateKey,msg),100)));
+    add('ECDSA P-256 verify', ms(await time(()=>subtle.verify({name:'ECDSA',hash:'SHA-256'},ec.publicKey,es,msg),100))); await pause();
+    const rp = {name:'RSASSA-PKCS1-v1_5',modulusLength:3072,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'};
+    add('RSA-3072 key pair', ms(await time(()=>subtle.generateKey(rp,false,['sign']),2))); await pause();
+    const rk = await subtle.generateKey(rp,false,['sign','verify']);
+    add('RSA-3072 sign', ms(await time(()=>subtle.sign('RSASSA-PKCS1-v1_5',rk.privateKey,msg),20))); await pause();
+    const pk = await subtle.importKey('raw',enc.encode('4829'),'PBKDF2',false,['deriveBits']), salt = rand(16);
+    for (const it of [100000,310000,600000]){ add(`PBKDF2, ${it.toLocaleString('en')} iterations`, ms(await time(()=>subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:it},pk,256),2))); await pause(); }
+    log('bank','Benchmark','Speed test finished on this device',{agent:navigator.userAgent.slice(0,60)+'…'});
+    btn.disabled = false; btn.textContent = 'Run again';
+  };
+}
+
+function resetAll(){
+  S = fresh(); unread = 0; badge();
+  $('#log').innerHTML = '<p class="empty" id="logEmpty">No traffic yet. Create a PIN in the app to enrol this device.</p>';
+  const p = $('#srvPill'); p.textContent = 'Waiting for enrolment'; p.className = 'pill';
+  syncServer(); setPane('app'); go('register');
+}
+$('#reset').onclick = resetAll;
+$('#tApp').onclick = () => setPane('app');
+$('#tSrv').onclick = () => setPane('server');
+
+setInterval(() => { const d = new Date(); $('#clock').textContent = d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'); }, 1000);
+go('register');
+</script>
+</body>
+</html>
